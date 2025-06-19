@@ -8,7 +8,7 @@ import Parallax from "./components/Parallax";
 import Testimonial from "./components/testimonial";
 
 function App() {
-  const [activeComponent, setActiveComponent] = useState("testimonial");
+  const [activeComponent, setActiveComponent] = useState("brands");
 
   const renderComponent = () => {
     switch (activeComponent) {
