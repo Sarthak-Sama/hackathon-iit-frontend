@@ -1,176 +1,285 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 
 function Ripple() {
-  const containerRef = useRef(null);
-  const [ripples, setRipples] = useState([]);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const rippleIdRef = useRef(0);
+  const canvasRef = useRef(null);
+  const backgroundCanvasRef = useRef(null);
+  const trailCanvasRef = useRef(null);
+  const animationRef = useRef();
+  const mouseTrail = useRef([]);
+  const mousePos = useRef({ x: 0, y: 0 });
+  const backgroundImage = useRef(null);
+  const lastUpdate = useRef(performance.now());
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const canvas = canvasRef.current;
+    const backgroundCanvas = backgroundCanvasRef.current;
+    const trailCanvas = trailCanvasRef.current;
+    if (!canvas || !backgroundCanvas || !trailCanvas) return;
 
-    let animationId;
-    let lastTime = 0;
-    const throttleDelay = 50; // Throttle ripple creation
+    const ctx = canvas.getContext("2d");
+    const bgCtx = backgroundCanvas.getContext("2d");
+    const trailCtx = trailCanvas.getContext("2d");
 
-    const handleMouseMove = (e) => {
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    // Load background image from Unsplash
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src =
+      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1920&h=1080&fit=crop&crop=center";
 
-      setMousePosition({ x, y });
+    img.onload = () => {
+      backgroundImage.current = img;
+      updateCanvasSize();
+    };
 
-      const currentTime = Date.now();
-      if (currentTime - lastTime > throttleDelay) {
-        const newRipple = {
-          id: rippleIdRef.current++,
-          x,
-          y,
-          size: Math.random() * 40 + 20,
-          opacity: 0.7,
-          createdAt: currentTime,
-        };
+    img.onerror = () => {
+      // Fallback to gradient if image fails to load
+      console.log("Image failed to load, using gradient fallback");
+      updateCanvasSize();
+    };
 
-        setRipples((prev) => [...prev.slice(-10), newRipple]); // Keep only last 10 ripples
-        lastTime = currentTime;
+    // Set canvas size and draw background
+    const updateCanvasSize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      canvas.width = width;
+      canvas.height = height;
+      backgroundCanvas.width = width;
+      backgroundCanvas.height = height;
+      trailCanvas.width = width;
+      trailCanvas.height = height;
+
+      if (backgroundImage.current) {
+        // Draw the Unsplash image to fit the canvas
+        bgCtx.drawImage(backgroundImage.current, 0, 0, width, height);
+        bgCtx.globalCompositeOperation = "overlay";
+        bgCtx.fillStyle = "rgba(0, 20, 40, 0.2)";
+        bgCtx.fillRect(0, 0, width, height);
+        bgCtx.globalCompositeOperation = "source-over";
+      } else {
+        // Fallback gradient
+        const gradient = bgCtx.createRadialGradient(
+          width * 0.3,
+          height * 0.2,
+          0,
+          width * 0.7,
+          height * 0.8,
+          width
+        );
+        gradient.addColorStop(0, "#667eea");
+        gradient.addColorStop(0.3, "#764ba2");
+        gradient.addColorStop(0.6, "#f093fb");
+        gradient.addColorStop(1, "#f5576c");
+        bgCtx.fillStyle = gradient;
+        bgCtx.fillRect(0, 0, width, height);
+      }
+
+      // Clear trail canvas with black background
+      trailCtx.fillStyle = "black";
+      trailCtx.fillRect(0, 0, width, height);
+    };
+
+    // Trail point class similar to your reference
+    class TrailPoint {
+      constructor(x, y, force = 1) {
+        this.x = x;
+        this.y = y;
+        this.age = 0;
+        this.maxAge = 750; // milliseconds
+        this.force = force;
+        this.timestamp = performance.now();
+      }
+
+      update(delta) {
+        this.age += delta;
+        return this.age < this.maxAge;
+      }
+
+      getIntensity() {
+        const normalizedAge = this.age / this.maxAge;
+        if (normalizedAge < 0.3) {
+          return this.easeCircleOut(normalizedAge / 0.3);
+        } else {
+          return this.easeCircleOut(1 - (normalizedAge - 0.3) / 0.7);
+        }
+      }
+
+      easeCircleOut(x) {
+        return Math.sqrt(1 - Math.pow(x - 1, 2));
+      }
+    }
+
+    // Clear trail canvas
+    const clearTrail = () => {
+      trailCtx.globalCompositeOperation = "source-over";
+      trailCtx.fillStyle = "black";
+      trailCtx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+
+    // Draw organic trail blobs
+    const drawTrailPoint = (point) => {
+      const intensity = point.getIntensity();
+      if (intensity <= 0) return;
+
+      const time = point.age * 0.001;
+      const baseRadius = 30 * intensity * point.force;
+
+      trailCtx.globalCompositeOperation = "screen";
+
+      // Create multiple organic blobs for fluid effect
+      for (let blob = 0; blob < 3; blob++) {
+        const offset = blob * 2.1;
+        const radiusVariation = 0.7 + 0.3 * Math.sin(time * 2 + offset);
+        const xDistortion = Math.sin(time * 1.5 + offset) * baseRadius * 0.3;
+        const yDistortion = Math.cos(time * 1.8 + offset) * baseRadius * 0.2;
+
+        const blobRadius = baseRadius * radiusVariation;
+        const blobX = point.x + xDistortion;
+        const blobY = point.y + yDistortion;
+
+        // Create flowing gradient
+        const grd = trailCtx.createRadialGradient(
+          blobX,
+          blobY,
+          blobRadius * 0.1,
+          blobX,
+          blobY,
+          blobRadius
+        );
+
+        const alpha = 0.3 * intensity * (1 - blob * 0.2);
+        grd.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        grd.addColorStop(0.3, `rgba(255, 255, 255, ${alpha * 0.7})`);
+        grd.addColorStop(0.7, `rgba(255, 255, 255, ${alpha * 0.3})`);
+        grd.addColorStop(1, `rgba(255, 255, 255, 0)`);
+
+        trailCtx.fillStyle = grd;
+        trailCtx.beginPath();
+
+        // Draw organic shape
+        const points = 8;
+        for (let i = 0; i <= points; i++) {
+          const angle = (i / points) * Math.PI * 2;
+          const noise = Math.sin(angle * 3 + time * 2) * 0.2;
+          const radius = blobRadius * (1 + noise);
+          const x = blobX + Math.cos(angle) * radius;
+          const y = blobY + Math.sin(angle) * radius;
+
+          if (i === 0) {
+            trailCtx.moveTo(x, y);
+          } else {
+            trailCtx.lineTo(x, y);
+          }
+        }
+
+        trailCtx.closePath();
+        trailCtx.fill();
       }
     };
 
-    // Clean up old ripples
-    const cleanupRipples = () => {
-      const currentTime = Date.now();
-      setRipples((prev) =>
-        prev.filter((ripple) => currentTime - ripple.createdAt < 2000)
+    // Mouse event handlers
+    const handleMouseMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const newPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+
+      const lastPos = mousePos.current;
+      const distance = Math.sqrt(
+        (newPos.x - lastPos.x) ** 2 + (newPos.y - lastPos.y) ** 2
       );
-      animationId = requestAnimationFrame(cleanupRipples);
+
+      if (distance > 3) {
+        const force = Math.max(0.3, Math.min(distance * 0.01, 1));
+        mouseTrail.current.push(new TrailPoint(newPos.x, newPos.y, force));
+
+        // Limit trail length
+        if (mouseTrail.current.length > 50) {
+          mouseTrail.current.shift();
+        }
+      }
+
+      mousePos.current = newPos;
     };
 
-    container.addEventListener("mousemove", handleMouseMove);
-    animationId = requestAnimationFrame(cleanupRipples);
+    // Animation loop
+    const animate = () => {
+      const now = performance.now();
+      const delta = now - lastUpdate.current;
+      lastUpdate.current = now;
+
+      // Clear main canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Update trail points
+      mouseTrail.current = mouseTrail.current.filter((point) =>
+        point.update(delta)
+      );
+
+      // Clear and redraw trail
+      clearTrail();
+      mouseTrail.current.forEach((point) => drawTrailPoint(point));
+
+      // Composite background with trail as displacement map
+      ctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(backgroundCanvas, 0, 0);
+
+      // Apply trail as distortion overlay
+      ctx.globalCompositeOperation = "multiply";
+      ctx.drawImage(trailCanvas, 0, 0);
+
+      // Add bright trail overlay
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.4;
+      ctx.drawImage(trailCanvas, 0, 0);
+      ctx.globalAlpha = 1;
+
+      // Draw current mouse cursor
+      ctx.globalCompositeOperation = "source-over";
+      ctx.beginPath();
+      ctx.arc(mousePos.current.x, mousePos.current.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    canvas.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("resize", updateCanvasSize);
+
+    setTimeout(() => {
+      animate();
+    }, 100);
 
     return () => {
-      container.removeEventListener("mousemove", handleMouseMove);
-      if (animationId) {
-        cancelAnimationFrame(animationId);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("resize", updateCanvasSize);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-screen h-screen overflow-hidden cursor-none bg-gradient-to-br from-blue-900 via-blue-700 to-teal-500"
-      style={{
-        backgroundImage: `
-          radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(14, 165, 233, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.3) 0%, transparent 50%)
-        `,
-      }}
-    >
-      {/* Background water texture overlay */}
-      <div className="absolute inset-0 opacity-20">
-        <svg width="100%" height="100%" className="animate-pulse">
-          <defs>
-            <pattern
-              id="water"
-              x="0"
-              y="0"
-              width="100"
-              height="100"
-              patternUnits="userSpaceOnUse"
-            >
-              <circle cx="25" cy="25" r="2" fill="rgba(255,255,255,0.1)" />
-              <circle cx="75" cy="75" r="1.5" fill="rgba(255,255,255,0.1)" />
-              <circle cx="50" cy="80" r="1" fill="rgba(255,255,255,0.1)" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#water)" />
-        </svg>
-      </div>
+    <div className="relative w-screen h-screen overflow-hidden cursor-none bg-black">
+      {/* Hidden background canvas */}
+      <canvas ref={backgroundCanvasRef} className="absolute inset-0 hidden" />
 
-      {/* Mouse follower */}
-      <div
-        className="absolute pointer-events-none transition-all duration-100 ease-out"
-        style={{
-          left: mousePosition.x - 10,
-          top: mousePosition.y - 10,
-          width: 20,
-          height: 20,
-          background:
-            "radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(59,130,246,0.4) 70%, transparent 100%)",
-          borderRadius: "50%",
-          filter: "blur(1px)",
-        }}
-      />
+      {/* Hidden trail canvas */}
+      <canvas ref={trailCanvasRef} className="absolute inset-0 hidden" />
 
-      {/* Ripples */}
-      {ripples.map((ripple) => (
-        <div
-          key={ripple.id}
-          className="absolute pointer-events-none animate-ping"
-          style={{
-            left: ripple.x - ripple.size / 2,
-            top: ripple.y - ripple.size / 2,
-            width: ripple.size,
-            height: ripple.size,
-            background: `radial-gradient(circle, 
-              rgba(255,255,255,${ripple.opacity * 0.6}) 0%, 
-              rgba(59,130,246,${ripple.opacity * 0.4}) 30%, 
-              rgba(14,165,233,${ripple.opacity * 0.2}) 60%, 
-              transparent 100%)`,
-            borderRadius: "50%",
-            animation: `rippleExpand 2s ease-out forwards`,
-          }}
-        />
-      ))}
+      {/* Main display canvas */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Watery trail effect */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          left: mousePosition.x - 30,
-          top: mousePosition.y - 30,
-          width: 60,
-          height: 60,
-          background: `radial-gradient(circle, 
-            rgba(255,255,255,0.1) 0%, 
-            rgba(59,130,246,0.2) 40%, 
-            rgba(14,165,233,0.1) 70%, 
-            transparent 100%)`,
-          borderRadius: "50%",
-          filter: "blur(8px)",
-          transition: "all 0.3s ease-out",
-        }}
-      />
-
-      {/* CSS for ripple animation */}
-      <style jsx>{`
-        @keyframes rippleExpand {
-          0% {
-            transform: scale(0.1);
-            opacity: 0.8;
-          }
-          50% {
-            transform: scale(0.8);
-            opacity: 0.4;
-          }
-          100% {
-            transform: scale(2);
-            opacity: 0;
-          }
-        }
-
-        .animate-ripple {
-          animation: rippleExpand 2s ease-out forwards;
-        }
-      `}</style>
-
-      {/* Optional content overlay */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-white text-4xl font-bold opacity-50 select-none">
-          Move your mouse
+      {/* Instructions overlay */}
+      <div className="absolute top-8 left-8 text-white text-lg font-medium pointer-events-none select-none z-10">
+        <div className="bg-black bg-opacity-50 px-4 py-2 rounded-lg backdrop-blur-sm">
+          <p>Move mouse to create fluid trail</p>
+          <p className="text-sm opacity-75">Organic morphing effect</p>
         </div>
       </div>
     </div>
