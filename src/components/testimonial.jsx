@@ -241,7 +241,7 @@ function testimonial() {
           <motion.div
             style={{ x: happyX }}
             className="absolute text-white font-black text-8xl md:text-9xl tracking-tight drop-shadow-2xl"
-            initial={{ x: -300 }}
+            initial={{ x: -210 }}
           >
             Happy
           </motion.div>
@@ -250,7 +250,7 @@ function testimonial() {
           <motion.div
             style={{ x: sellersX }}
             className="absolute text-white font-black text-8xl md:text-9xl tracking-tight drop-shadow-2xl"
-            initial={{ x: 300 }}
+            initial={{ x: 210 }}
           >
             Sellers
           </motion.div>

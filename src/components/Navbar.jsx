@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import {
@@ -11,6 +11,14 @@ import {
 const Navbar = ({ activeComponent, setActiveComponent }) => {
   const { isDark, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+
+  // Track scroll position to prevent layout shift issues
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const components = [
     { id: "brands", name: "Brands", icon: "🏢" },
@@ -28,6 +36,7 @@ const Navbar = ({ activeComponent, setActiveComponent }) => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 hidden md:block"
+        style={{ position: "fixed" }} // Ensure consistent positioning
       >
         <div className="bg-white/10 dark:bg-black/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-full px-6 py-3 shadow-2xl">
           <div className="flex items-center space-x-6">
@@ -54,6 +63,7 @@ const Navbar = ({ activeComponent, setActiveComponent }) => {
                     <motion.div
                       layoutId="activeTab"
                       className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                      initial={false}
                       transition={{
                         type: "spring",
                         bounce: 0.2,

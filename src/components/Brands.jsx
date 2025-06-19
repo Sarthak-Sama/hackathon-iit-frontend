@@ -54,7 +54,7 @@ function Brands() {
 
         {/* Brands Grid */}
         <div
-          className={`w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8 lg:gap-12 items-center transition-all duration-500 ${
+          className={`w-full grid grid-cols-2 sm:grid-cols-3 gap-8 lg:gap-12 items-center transition-all duration-500 ${
             isHovering ? "blur-sm cursor-none" : ""
           }`}
         >

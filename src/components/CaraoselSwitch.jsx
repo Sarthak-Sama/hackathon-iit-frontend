@@ -1,10 +1,10 @@
 import { RiAddLine } from "@remixicon/react";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../context/ThemeContext";
+import { div } from "framer-motion/client";
 
 function CaraoselSwitch() {
-  const { isDark, toggleTheme } = useTheme();
+  const [isDarkMode, setIsDarkMode] = useState(true); // This should come from your theme context
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const brands = [
