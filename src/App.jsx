@@ -6,6 +6,7 @@ import Cards from "./components/Cards";
 import CaraoselSwitch from "./components/CaraoselSwitch";
 import Parallax from "./components/Parallax";
 import Testimonial from "./components/testimonial";
+import Ripple from "./components/Ripple";
 
 function App() {
   const [activeComponent, setActiveComponent] = useState("brands");
@@ -23,13 +24,7 @@ function App() {
       case "testimonial":
         return <Testimonial />;
       case "ripple":
-        return (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-4xl text-gray-500 dark:text-gray-400">
-              Ripple Component Coming Soon...
-            </div>
-          </div>
-        );
+        return <Ripple />;
       default:
         return <Testimonial />;
     }
